@@ -1,0 +1,16 @@
+{
+  "configurations": [
+    {
+      "name": "Win32",
+      "includePath": [
+        "C:\\Users\\erikh\\Documents\\Arduino\\libraries\\Regexp\\src",
+        "C:\\Users\\erikh\\Documents\\Arduino\\libraries\\Adafruit_MQTT_Library",
+        "C:\\Users\\erikh\\AppData\\Local\\Arduino15\\packages\\esp8266\\hardware\\esp8266\\2.7.0\\**",
+        "C:\\Users\\erikh\\AppData\\Local\\Arduino15\\packages\\esp8266\\tools\\**"
+      ],
+      "forcedInclude": [],
+      "intelliSenseMode": "msvc-x64"
+    }
+  ],
+  "version": 4
+}
