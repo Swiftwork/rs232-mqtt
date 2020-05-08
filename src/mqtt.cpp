@@ -51,7 +51,7 @@ void MQTTClient::connect()
   while ((ret = mqtt.connect()) != 0)
   { // connect will return 0 for connected
     Serial.println(mqtt.connectErrorString(ret));
-    Serial.print("Retrying MQTT connection in 5 seconds...");
+    Serial.print("Retrying MQTT connection in 5 seconds... ");
     mqtt.disconnect();
     delay(5000); // wait 5 seconds
     retries--;
@@ -142,7 +142,9 @@ String MQTTClient::collectState()
 
 void MQTTClient::publishState()
 {
-  state_pub.publish(collectState().c_str());
+  String state = collectState();
+  Serial.println(state);
+  state_pub.publish(state.c_str());
 }
 
 // COMMANDS

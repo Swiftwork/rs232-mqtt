@@ -1,3 +1,4 @@
+#include <Arduino.h>
 #include <ESP8266WiFi.h>
 
 #include "secrets.h"
@@ -9,11 +10,17 @@ WiFiClient wifiClient;
 OTAClient otaClient;
 MQTTClient mqttClient(&wifiClient);
 
+// LED
+unsigned long ledPrevMs = 0;
+const long ledIntervalMs = 1000;
+int ledState = LOW;
+
 void setup()
 {
   wifiConnect();
   otaClient.start();
   mqttClient.start();
+  pinMode(LED_BUILTIN, OUTPUT);
 }
 
 void wifiConnect()
@@ -41,4 +48,13 @@ void loop()
 {
   otaClient.update();
   mqttClient.update();
+
+  // Blink without delay
+  unsigned long currentMs = millis();
+  if (currentMs - ledPrevMs >= ledIntervalMs)
+  {
+    ledPrevMs = currentMs;
+    ledState = not(ledState);
+    digitalWrite(LED_BUILTIN, ledState);
+  }
 }
