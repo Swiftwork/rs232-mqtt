@@ -1,9 +1,8 @@
 #include <Regexp.h>
 #include <ESP8266WiFi.h>
-#include <Adafruit_MQTT.h>
-#include <Adafruit_MQTT_Client.h>
+#include <PubSubClient.h>
 
-#include "../secrets.h"
+#include "secrets.h"
 #include "mqtt.h"
 
 // PROJECTOR SPECIFICS
@@ -11,15 +10,21 @@ const String SERIAL_COMMAND_PREPEND = "\r*";
 const String SERIAL_COMMAND_APPEND = "#\r";
 const int SERIAL_BAUD_RATE = 9600;
 
-MQTTClient::MQTTClient(WiFiClient *wifiClient)
+// MQTT
+const long STATE_INTERVAL_MS = 5000;
+unsigned long statePrevMs = 0;
+
+// TOPICS
+const char *TOPIC_STAT_STATE = "stat/projector/STATE";
+const char *TOPIC_STAT_COMMAND = "stat/projector/COMMAND";
+const char *TOPIC_CMND_POWER = "cmnd/projector/POWER";
+const char *TOPIC_CMND_VOLUME = "cmnd/projector/VOLUME";
+const char *TOPIC_CMND_SOURCE = "cmnd/projector/SOURCE";
+const char *TOPIC_CMND_COMMAND = "cmnd/projector/COMMAND";
+
+MQTTClient::MQTTClient(WiFiClient &wifiClient)
     : wifiClient(wifiClient),
-      mqtt(Adafruit_MQTT_Client(wifiClient, MQTT_SERVER, MQTT_SERVERPORT, MQTT_USERNAME, MQTT_KEY)),
-      state_pub(Adafruit_MQTT_Publish(&mqtt, "stat/projector/STATE")),
-      command_pub(Adafruit_MQTT_Publish(&mqtt, "stat/projector/COMMAND")),
-      power_sub(Adafruit_MQTT_Subscribe(&mqtt, "cmnd/projector/POWER")),
-      volume_sub(Adafruit_MQTT_Subscribe(&mqtt, "cmnd/projector/VOLUME")),
-      source_sub(Adafruit_MQTT_Subscribe(&mqtt, "cmnd/projector/SOURCE")),
-      command_sub(Adafruit_MQTT_Subscribe(&mqtt, "cmnd/projector/COMMAND"))
+      mqtt(PubSubClient(wifiClient))
 {
 }
 
@@ -28,72 +33,89 @@ void MQTTClient::start()
   Serial.println("Initializing MQTT Client");
   Serial1.begin(SERIAL_BAUD_RATE);
 
-  // Setup MQTT subscriptions
-  mqtt.subscribe(&power_sub);
-  mqtt.subscribe(&volume_sub);
-  mqtt.subscribe(&source_sub);
-  mqtt.subscribe(&command_sub);
-}
-
-void MQTTClient::connect()
-{
-  int8_t ret;
-
-  // Stop if already connected.
-  if (mqtt.connected())
-  {
-    return;
-  }
-
-  Serial.print((String) "Connecting to MQTT server mqtt://" + MQTT_USERNAME + ":xxx@" + MQTT_SERVER + ":" + MQTT_SERVERPORT + "... ");
-
-  uint8_t retries = 3;
-  while ((ret = mqtt.connect()) != 0)
-  { // connect will return 0 for connected
-    Serial.println(mqtt.connectErrorString(ret));
-    Serial.print("Retrying MQTT connection in 5 seconds... ");
-    mqtt.disconnect();
-    delay(5000); // wait 5 seconds
-    retries--;
-    if (retries == 0)
-    {
-      // basically die and wait for WDT to reset me
-      while (1)
-        ;
-    }
-  }
-  Serial.println("MQTT connected!");
+  mqtt.setServer(MQTT_SERVER, MQTT_SERVERPORT);
+  mqtt.setCallback([this](char *topic, uint8_t *payload, unsigned int length) {
+    callback(topic, payload, length);
+  });
 }
 
 void MQTTClient::update()
 {
-  MQTTClient::connect();
-  Adafruit_MQTT_Subscribe *subscription;
-
-  while ((subscription = mqtt.readSubscription(5000)))
+  if (!mqtt.connected())
   {
-    if (subscription == &power_sub)
+    connect();
+  }
+  mqtt.loop();
+
+  // Publish current state every stateIntervalMs
+  unsigned long now = millis();
+  if (now - statePrevMs > STATE_INTERVAL_MS)
+  {
+    statePrevMs = now;
+    publishState();
+  }
+}
+
+void MQTTClient::connect()
+{
+  Serial.printf("MQTT server mqtt://%s:xxx@%s:%d\n", MQTT_USERNAME, MQTT_SERVER, MQTT_SERVERPORT);
+
+  // Loop until we're reconnected
+  while (!mqtt.connected())
+  {
+    Serial.print("Attempting MQTT connection... ");
+    // Create a random client ID
+    String clientId = "ESP8266Client-";
+    clientId += String(random(0xffff), HEX);
+    // Attempt to connect
+    if (mqtt.connect(clientId.c_str(), MQTT_USERNAME, MQTT_KEY))
     {
-      publishCommand("pow=" + String((char *)power_sub.lastread));
-      publishState();
+      Serial.println("connected");
+
+      // Subscriptions
+      mqtt.subscribe(TOPIC_CMND_POWER);
+      mqtt.subscribe(TOPIC_CMND_VOLUME);
+      mqtt.subscribe(TOPIC_CMND_SOURCE);
+      mqtt.subscribe(TOPIC_CMND_COMMAND);
     }
-    if (subscription == &volume_sub)
+    else
     {
-      setVolume(atoi((char *)volume_sub.lastread));
-      publishState();
-    }
-    if (subscription == &source_sub)
-    {
-      publishCommand("sour=" + String((char *)source_sub.lastread));
-      publishState();
-    }
-    if (subscription == &command_sub)
-    {
-      publishCommand((char *)command_sub.lastread);
-      publishState();
+      Serial.print("failed, rc=");
+      Serial.print(mqtt.state());
+      Serial.println(" try again in 5 seconds");
+      // Wait 5 seconds before retrying
+      delay(5000);
     }
   }
-  publishState();
+}
+
+void MQTTClient::callback(char *topic, uint8_t *payload, unsigned int length)
+{
+  Serial.print("Topic [");
+  Serial.print(topic);
+  Serial.print("] received ");
+  Serial.println(String((char *)payload));
+
+  if (topic == TOPIC_CMND_POWER)
+  {
+    publishCommand("pow=" + String((char *)payload));
+    publishState();
+  }
+  if (topic == TOPIC_CMND_VOLUME)
+  {
+    setVolume(atoi((char *)payload));
+    publishState();
+  }
+  if (topic == TOPIC_CMND_SOURCE)
+  {
+    publishCommand("sour=" + String((char *)payload));
+    publishState();
+  }
+  if (topic == TOPIC_CMND_COMMAND)
+  {
+    publishCommand((char *)payload);
+    publishState();
+  }
 }
 
 // STATE
@@ -144,7 +166,7 @@ void MQTTClient::publishState()
 {
   String state = collectState();
   Serial.println(state);
-  state_pub.publish(state.c_str());
+  mqtt.publish(TOPIC_STAT_STATE, state.c_str());
 }
 
 // COMMANDS
@@ -162,8 +184,8 @@ String MQTTClient::serialCommand(String serial_command)
 String MQTTClient::publishCommand(String command)
 {
   String response = serialCommand(command);
-  String status_response = "{\"COMMAND\":\"" + command + "\",\"RESPONSE\":\"" + response + "\"}";
-  command_pub.publish(status_response.c_str());
+  String statusResponse = "{\"COMMAND\":\"" + command + "\",\"RESPONSE\":\"" + response + "\"}";
+  mqtt.publish(TOPIC_STAT_COMMAND, statusResponse.c_str());
   return response;
 }
 

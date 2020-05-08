@@ -2,30 +2,22 @@
 #define MQTT_H
 
 #include <ESP8266WiFi.h>
-#include <Adafruit_MQTT.h>
-#include <Adafruit_MQTT_Client.h>
+#include <PubSubClient.h>
 
 class MQTTClient
 {
 public:
-  MQTTClient(WiFiClient *wifiClient);
+  MQTTClient(WiFiClient &wifiClient);
   void start();
   void update();
 
 private:
-  WiFiClient *wifiClient;
+  WiFiClient &wifiClient;
 
   // MQTT
-  Adafruit_MQTT_Client mqtt;
-  Adafruit_MQTT_Publish state_pub;
-  Adafruit_MQTT_Publish command_pub;
-  Adafruit_MQTT_Subscribe power_sub;
-  Adafruit_MQTT_Subscribe volume_sub;
-  Adafruit_MQTT_Subscribe source_sub;
-  Adafruit_MQTT_Subscribe command_sub;
-
-  // INIT
+  PubSubClient mqtt;
   void connect();
+  void callback(char *topic, uint8_t *payload, unsigned int length);
 
   // STATE
   String getPowerState();

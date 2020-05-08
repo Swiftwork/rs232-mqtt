@@ -2,26 +2,18 @@
 #include <ESP8266WiFi.h>
 
 #include "secrets.h"
-#include "src/mqtt.h"
-#include "src/ota.h"
+#include "mqtt.h"
+#include "ota.h"
 
 // WIFI
 WiFiClient wifiClient;
 OTAClient otaClient;
-MQTTClient mqttClient(&wifiClient);
+MQTTClient mqttClient(wifiClient);
 
 // LED
 unsigned long ledPrevMs = 0;
 const long ledIntervalMs = 1000;
 int ledState = LOW;
-
-void setup()
-{
-  wifiConnect();
-  otaClient.start();
-  mqttClient.start();
-  pinMode(LED_BUILTIN, OUTPUT);
-}
 
 void wifiConnect()
 {
@@ -38,10 +30,17 @@ void wifiConnect()
     delay(500);
     Serial.print(".");
   }
-  Serial.println();
-  Serial.println("WiFi connected");
+  Serial.println(" connected");
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
+}
+
+void setup()
+{
+  wifiConnect();
+  otaClient.start();
+  mqttClient.start();
+  pinMode(LED_BUILTIN, OUTPUT);
 }
 
 void loop()
