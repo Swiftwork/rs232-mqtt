@@ -7,6 +7,8 @@
 #include "mqtt.h"
 #include "rs232.h"
 
+using namespace std;
+
 // MQTT
 const long STATE_INTERVAL_MS = 5000;
 unsigned long statePrevMs = 0;
@@ -32,9 +34,7 @@ void MQTTClient::start()
   debugI("Initializing MQTT Client");
 
   mqtt.setServer(MQTT_SERVER, MQTT_SERVERPORT);
-  mqtt.setCallback([this](char *topic, uint8_t *payload, unsigned int length) {
-    callback(topic, payload, length);
-  });
+  mqtt.setCallback(bind(&MQTTClient::callback, this, placeholders::_1, placeholders::_2, placeholders::_3));
 }
 
 void MQTTClient::update()
@@ -86,21 +86,23 @@ void MQTTClient::connect()
 
 void MQTTClient::callback(char *topic, uint8_t *payload, unsigned int length)
 {
-  debugD("Topic [%s]", topic);
+  payload[length] = '\0';
+  char *data = (char *)payload;
+  debugD("Topic [%s] Payload(%d) [%s]", topic, length, data);
 
   if (strcmp(topic, TOPIC_CMND_POWER) == 0)
   {
-    RS232.setPower(atoi((char *)payload) > 0);
+    RS232.setPower(atoi(data) > 0);
     publishState();
   }
   if (strcmp(topic, TOPIC_CMND_VOLUME) == 0)
   {
-    RS232.setVolume(atoi((char *)payload));
+    RS232.setVolume(atoi(data));
     publishState();
   }
   if (strcmp(topic, TOPIC_CMND_SOURCE) == 0)
   {
-    switch (atoi((char *)payload))
+    switch (atoi(data))
     {
     case 0:
       RS232.setSource(Source::DSub);
@@ -116,7 +118,17 @@ void MQTTClient::callback(char *topic, uint8_t *payload, unsigned int length)
   }
   if (strcmp(topic, TOPIC_CMND_COMMAND) == 0)
   {
-    publishCommand((char *)payload);
+
+    StaticJsonDocument<200> doc;
+    DeserializationError error = deserializeJson(doc, data);
+    if (error)
+    {
+      debugE("Deserializing JSON failed");
+      debugD("Error: %s", error.c_str());
+      return;
+    }
+    JsonArray array = doc.as<JsonArray>();
+    RS232.set(array[0], array[1], array[2]);
     publishState();
   }
 }
@@ -141,13 +153,7 @@ void MQTTClient::publishState()
 
 // COMMANDS
 
-String MQTTClient::publishCommand(String command)
+String MQTTClient::publishCommand(char *command)
 {
-  /*
-  String response = serialCommand(command);
-  String statusResponse = "{\"COMMAND\":\"" + command + "\",\"RESPONSE\":\"" + response + "\"}";
-  mqtt.publish(TOPIC_STAT_COMMAND, statusResponse.c_str());
-  return response;
-  */
   return "";
 }

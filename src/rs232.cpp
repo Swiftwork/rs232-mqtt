@@ -12,6 +12,7 @@ RS232Util::RS232Util(RemoteDebug &Debug) : Debug(Debug)
 
 boolean RS232Util::set(uint8_t cmd1, uint8_t cmd2, uint8_t value)
 {
+  debugD("%d %d %d", cmd1, cmd2, value);
   // Write = 0x06, 0x14, 0x00, LSB = 0x04, MSB = 0x00, 0x34, CMD2, CMD3, Data, Checksum
   uint8_t set[10] = {0x06, 0x14, 0x00, 0x04, 0x00, 0x34, cmd1, cmd2, value, 0x00};
   checksum(set, 10);

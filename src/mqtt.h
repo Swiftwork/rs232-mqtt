@@ -32,7 +32,7 @@ private:
 
   // COMMANDS
   String serialCommand(String serial_command);
-  String publishCommand(String command);
+  String publishCommand(char *command);
   void setVolume(int target_volume);
 
   // HELPER
