@@ -4,6 +4,7 @@
 
 #include "secrets.h"
 #include "mqtt.h"
+#include "rs232.h"
 
 // PROJECTOR SPECIFICS
 const String SERIAL_COMMAND_PREPEND = "\r*";
@@ -98,17 +99,28 @@ void MQTTClient::callback(char *topic, uint8_t *payload, unsigned int length)
 
   if (topic == TOPIC_CMND_POWER)
   {
-    publishCommand("pow=" + String((char *)payload));
+    RS232.setPower(payload);
     publishState();
   }
   if (topic == TOPIC_CMND_VOLUME)
   {
-    setVolume(atoi((char *)payload));
+    RS232.setVolume(atoi((char *)payload));
     publishState();
   }
   if (topic == TOPIC_CMND_SOURCE)
   {
-    publishCommand("sour=" + String((char *)payload));
+    switch (atoi((char *)payload))
+    {
+    case 0:
+      RS232.setSource(Source::DSub);
+      break;
+    case 1:
+      RS232.setSource(Source::HDMI1);
+      break;
+    case 2:
+      RS232.setSource(Source::HDMI2);
+      break;
+    }
     publishState();
   }
   if (topic == TOPIC_CMND_COMMAND)
@@ -120,44 +132,15 @@ void MQTTClient::callback(char *topic, uint8_t *payload, unsigned int length)
 
 // STATE
 
-String MQTTClient::getPowerState()
-{
-  char current_power_status[50];
-  serialCommand("pow=?").toCharArray(current_power_status, 50);
-  String result = regex(current_power_status, "POW=([^#]*)");
-  if (result == "UNKNOWN")
-  {
-    return "OFF";
-  }
-  else
-  {
-    return result;
-  }
-}
-
-String MQTTClient::getSourceState()
-{
-  char current_source_status[50];
-  serialCommand("sour=?").toCharArray(current_source_status, 50);
-  return regex(current_source_status, "SOUR=([^#]*)");
-}
-
-int MQTTClient::getVolumeState()
-{
-  char current_volume_status[50];
-  serialCommand("vol=?").toCharArray(current_volume_status, 50);
-  return (regex(current_volume_status, "VOL=([^#]*)")).toInt();
-}
-
 String MQTTClient::collectState()
 {
   String current_status;
   current_status += "{";
-  current_status += "\"POWER\":\"" + getPowerState() + "\"";
+  current_status += "\"Power\":\"" + (String)RS232.getPower() + "\"";
   current_status += ",";
-  current_status += "\"SOURCE\":\"" + getSourceState() + "\"";
+  current_status += "\"Source\":\"" + (String)RS232.getSource() + "\"";
   current_status += ",";
-  current_status += "\"VOLUME\":\"" + String(getVolumeState()) + "\"";
+  current_status += "\"Volume\":\"" + (String)RS232.getVolume() + "\"";
   current_status += "}";
   return current_status;
 }
@@ -165,28 +148,20 @@ String MQTTClient::collectState()
 void MQTTClient::publishState()
 {
   String state = collectState();
-  Serial.println(state);
   mqtt.publish(TOPIC_STAT_STATE, state.c_str());
 }
 
 // COMMANDS
 
-String MQTTClient::serialCommand(String serial_command)
-{
-  Serial1.print(SERIAL_COMMAND_PREPEND);
-  Serial1.print(serial_command);
-  Serial1.print(SERIAL_COMMAND_APPEND);
-
-  String serial_response = Serial.readString();
-  return serial_response;
-}
-
 String MQTTClient::publishCommand(String command)
 {
+  /*
   String response = serialCommand(command);
   String statusResponse = "{\"COMMAND\":\"" + command + "\",\"RESPONSE\":\"" + response + "\"}";
   mqtt.publish(TOPIC_STAT_COMMAND, statusResponse.c_str());
   return response;
+  */
+  return "";
 }
 
 // HELPERS
