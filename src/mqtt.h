@@ -2,17 +2,22 @@
 #define MQTT_H
 
 #include <ESP8266WiFi.h>
+#include <RemoteDebug.h>
 #include <PubSubClient.h>
+
+#include "rs232.h"
 
 class MQTTClient
 {
 public:
-  MQTTClient(WiFiClient &wifiClient);
+  MQTTClient(WiFiClient &wifiClient, RemoteDebug &Debug);
   void start();
   void update();
 
 private:
   WiFiClient &wifiClient;
+  RemoteDebug &Debug;
+  RS232Util RS232;
 
   // MQTT
   PubSubClient mqtt;
@@ -23,7 +28,6 @@ private:
   String getPowerState();
   String getSourceState();
   int getVolumeState();
-  String collectState();
   void publishState();
 
   // COMMANDS

@@ -1,6 +1,8 @@
 #ifndef RS232_H
 #define RS232_H
 
+#include <RemoteDebug.h>
+
 enum Source
 {
   DSub = 0x00,
@@ -11,23 +13,25 @@ enum Source
 class RS232Util
 {
 public:
-  RS232Util();
-  static boolean set(uint8_t cmd1, uint8_t cmd2, uint8_t value);
-  static uint8_t get(uint8_t cmd1, uint8_t cmd2);
+  RS232Util(RemoteDebug &Debug);
 
-  static boolean setPower(boolean on);
-  static boolean getPower();
+  boolean set(uint8_t cmd1, uint8_t cmd2, uint8_t value);
+  uint8_t get(uint8_t cmd1, uint8_t cmd2);
 
-  static boolean setSource(Source source);
-  static Source getSource();
+  boolean setPower(boolean on);
+  boolean getPower();
 
-  static boolean setVolume(float percent);
-  static float getVolume();
+  boolean setSource(Source source);
+  Source getSource();
+
+  boolean setVolume(float percent);
+  float getVolume();
 
 private:
-  static uint8_t checksum(uint8_t payload[]);
-};
+  RemoteDebug &Debug;
 
-extern RS232Util RS232;
+  void debugCommand(char *label, uint8_t *payload, size_t size);
+  void checksum(uint8_t *payload, size_t size);
+};
 
 #endif

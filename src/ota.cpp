@@ -1,16 +1,17 @@
+#include <RemoteDebug.h>
 #include <ArduinoOTA.h>
 
 #include "ota.h"
 
 using namespace std;
 
-OTAClient::OTAClient()
+OTAClient::OTAClient(RemoteDebug &Debug) : Debug(Debug)
 {
 }
 
 void OTAClient::start()
 {
-  Serial.println("Initializing Over-The-Air Client");
+  debugI("Initializing Over-The-Air Client");
   ArduinoOTA.onStart(bind(&OTAClient::onStart, this));
   ArduinoOTA.onEnd(bind(&OTAClient::onEnd, this));
   ArduinoOTA.onProgress(bind(&OTAClient::onProgress, this, placeholders::_1, placeholders::_2));
@@ -34,40 +35,40 @@ void OTAClient::onStart()
   { // U_SPIFFS
     type = "filesystem";
   }
-  Serial.println("Start OTA updating " + type);
+  debugI("Start OTA updating %s", type.c_str());
 }
 
 void OTAClient::onEnd()
 {
-  Serial.println("\nEnd");
+  debugI("OTA update ended");
 }
 
 void OTAClient::onProgress(unsigned int progress, unsigned int total)
 {
-  Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+  debugD("Progress: %u%%\r", (progress / (total / 100)));
 }
 
 void OTAClient::onError(ota_error_t error)
 {
-  Serial.printf("Error[%u]: ", error);
+  debugE("Error[%u]: ", error);
   if (error == OTA_AUTH_ERROR)
   {
-    Serial.println("Auth Failed");
+    debugE("Auth Failed");
   }
   else if (error == OTA_BEGIN_ERROR)
   {
-    Serial.println("Begin Failed");
+    debugE("Begin Failed");
   }
   else if (error == OTA_CONNECT_ERROR)
   {
-    Serial.println("Connect Failed");
+    debugE("Connect Failed");
   }
   else if (error == OTA_RECEIVE_ERROR)
   {
-    Serial.println("Receive Failed");
+    debugE("Receive Failed");
   }
   else if (error == OTA_END_ERROR)
   {
-    Serial.println("End Failed");
+    debugE("End Failed");
   }
 }

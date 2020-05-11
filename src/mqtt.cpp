@@ -1,15 +1,11 @@
-#include <Regexp.h>
 #include <ESP8266WiFi.h>
+#include <RemoteDebug.h>
 #include <PubSubClient.h>
+#include <ArduinoJson.h>
 
 #include "secrets.h"
 #include "mqtt.h"
 #include "rs232.h"
-
-// PROJECTOR SPECIFICS
-const String SERIAL_COMMAND_PREPEND = "\r*";
-const String SERIAL_COMMAND_APPEND = "#\r";
-const int SERIAL_BAUD_RATE = 9600;
 
 // MQTT
 const long STATE_INTERVAL_MS = 5000;
@@ -23,16 +19,17 @@ const char *TOPIC_CMND_VOLUME = "cmnd/projector/VOLUME";
 const char *TOPIC_CMND_SOURCE = "cmnd/projector/SOURCE";
 const char *TOPIC_CMND_COMMAND = "cmnd/projector/COMMAND";
 
-MQTTClient::MQTTClient(WiFiClient &wifiClient)
+MQTTClient::MQTTClient(WiFiClient &wifiClient, RemoteDebug &Debug)
     : wifiClient(wifiClient),
+      Debug(Debug),
+      RS232(RS232Util(Debug)),
       mqtt(PubSubClient(wifiClient))
 {
 }
 
 void MQTTClient::start()
 {
-  Serial.println("Initializing MQTT Client");
-  Serial1.begin(SERIAL_BAUD_RATE);
+  debugI("Initializing MQTT Client");
 
   mqtt.setServer(MQTT_SERVER, MQTT_SERVERPORT);
   mqtt.setCallback([this](char *topic, uint8_t *payload, unsigned int length) {
@@ -59,19 +56,19 @@ void MQTTClient::update()
 
 void MQTTClient::connect()
 {
-  Serial.printf("MQTT server mqtt://%s:xxx@%s:%d\n", MQTT_USERNAME, MQTT_SERVER, MQTT_SERVERPORT);
+  debugI("MQTT server mqtt://%s:xxx@%s:%d\n", MQTT_USERNAME, MQTT_SERVER, MQTT_SERVERPORT);
 
   // Loop until we're reconnected
   while (!mqtt.connected())
   {
-    Serial.print("Attempting MQTT connection... ");
+    debugI("Attempting MQTT connection... ");
     // Create a random client ID
     String clientId = "ESP8266Client-";
     clientId += String(random(0xffff), HEX);
     // Attempt to connect
     if (mqtt.connect(clientId.c_str(), MQTT_USERNAME, MQTT_KEY))
     {
-      Serial.println("connected");
+      debugI("connected");
 
       // Subscriptions
       mqtt.subscribe(TOPIC_CMND_POWER);
@@ -81,10 +78,7 @@ void MQTTClient::connect()
     }
     else
     {
-      Serial.print("failed, rc=");
-      Serial.print(mqtt.state());
-      Serial.println(" try again in 5 seconds");
-      // Wait 5 seconds before retrying
+      debugW("failed, rc=%d try again in 5 seconds", mqtt.state());
       delay(5000);
     }
   }
@@ -92,22 +86,19 @@ void MQTTClient::connect()
 
 void MQTTClient::callback(char *topic, uint8_t *payload, unsigned int length)
 {
-  Serial.print("Topic [");
-  Serial.print(topic);
-  Serial.print("] received ");
-  Serial.println(String((char *)payload));
+  debugD("Topic [%s]", topic);
 
-  if (topic == TOPIC_CMND_POWER)
+  if (strcmp(topic, TOPIC_CMND_POWER) == 0)
   {
-    RS232.setPower(payload);
+    RS232.setPower(atoi((char *)payload) > 0);
     publishState();
   }
-  if (topic == TOPIC_CMND_VOLUME)
+  if (strcmp(topic, TOPIC_CMND_VOLUME) == 0)
   {
     RS232.setVolume(atoi((char *)payload));
     publishState();
   }
-  if (topic == TOPIC_CMND_SOURCE)
+  if (strcmp(topic, TOPIC_CMND_SOURCE) == 0)
   {
     switch (atoi((char *)payload))
     {
@@ -123,7 +114,7 @@ void MQTTClient::callback(char *topic, uint8_t *payload, unsigned int length)
     }
     publishState();
   }
-  if (topic == TOPIC_CMND_COMMAND)
+  if (strcmp(topic, TOPIC_CMND_COMMAND) == 0)
   {
     publishCommand((char *)payload);
     publishState();
@@ -132,23 +123,20 @@ void MQTTClient::callback(char *topic, uint8_t *payload, unsigned int length)
 
 // STATE
 
-String MQTTClient::collectState()
-{
-  String current_status;
-  current_status += "{";
-  current_status += "\"Power\":\"" + (String)RS232.getPower() + "\"";
-  current_status += ",";
-  current_status += "\"Source\":\"" + (String)RS232.getSource() + "\"";
-  current_status += ",";
-  current_status += "\"Volume\":\"" + (String)RS232.getVolume() + "\"";
-  current_status += "}";
-  return current_status;
-}
-
 void MQTTClient::publishState()
 {
-  String state = collectState();
-  mqtt.publish(TOPIC_STAT_STATE, state.c_str());
+  return;
+  boolean power = RS232.getPower();
+  Source source = RS232.getSource();
+  float volume = RS232.getVolume();
+  StaticJsonDocument<256> doc;
+  doc["power"] = power;
+  doc["source"] = source;
+  doc["volume"] = volume;
+  char state[256];
+  size_t n = serializeJson(doc, state, 256);
+  debugD("publish: %s", state);
+  mqtt.publish(TOPIC_STAT_STATE, state, n);
 }
 
 // COMMANDS
@@ -162,39 +150,4 @@ String MQTTClient::publishCommand(String command)
   return response;
   */
   return "";
-}
-
-// HELPERS
-
-void MQTTClient::setVolume(int target_volume)
-{
-  int delta = target_volume - getVolumeState();
-  for (int i = 1; i <= abs(delta); i++)
-  {
-    if (delta > 0)
-    {
-      publishCommand("vol=+");
-    }
-    else
-    {
-      publishCommand("vol=-");
-    }
-  }
-}
-
-String MQTTClient::regex(char match_array[], String match_string)
-{
-  MatchState parse_result;
-  char match_result[100];
-
-  parse_result.Target(match_array);
-  if (parse_result.Match(match_string.c_str()) == REGEXP_MATCHED)
-  {
-    parse_result.GetCapture(match_result, 0);
-    return String(match_result);
-  }
-  else
-  {
-    return "UNKNOWN";
-  }
 }

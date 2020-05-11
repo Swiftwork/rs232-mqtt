@@ -1,0 +1,12 @@
+{
+  // See https://go.microsoft.com/fwlink/?LinkId=733558
+  // for the documentation about the tasks.json format
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Stacktrace",
+      "type": "shell",
+      "command": "java -jar ./tools/EspStackTraceDecoder.jar C:/Users/erikh/AppData/Local/Arduino15/packages/esp8266/tools/xtensa-lx106-elf-gcc/2.5.0-4-b40a506/bin/xtensa-lx106-elf-addr2line.exe ./.pio/build/huzzah/firmware.elf ./tmp/dump.txt"
+    }
+  ]
+}
