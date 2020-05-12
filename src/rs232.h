@@ -27,6 +27,8 @@ public:
   boolean setVolume(float percent);
   float getVolume();
 
+  float getTemperature();
+
 private:
   RemoteDebug &Debug;
 

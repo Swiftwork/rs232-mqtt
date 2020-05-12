@@ -20,6 +20,7 @@ const char *TOPIC_CMND_POWER = "cmnd/projector/POWER";
 const char *TOPIC_CMND_VOLUME = "cmnd/projector/VOLUME";
 const char *TOPIC_CMND_SOURCE = "cmnd/projector/SOURCE";
 const char *TOPIC_CMND_COMMAND = "cmnd/projector/COMMAND";
+const char *TOPIC_CMND_TEMPERATURE = "cmnd/projector/TEMPERATURE";
 
 MQTTClient::MQTTClient(WiFiClient &wifiClient, RemoteDebug &Debug)
     : wifiClient(wifiClient),
@@ -75,6 +76,7 @@ void MQTTClient::connect()
       mqtt.subscribe(TOPIC_CMND_VOLUME);
       mqtt.subscribe(TOPIC_CMND_SOURCE);
       mqtt.subscribe(TOPIC_CMND_COMMAND);
+      mqtt.subscribe(TOPIC_CMND_TEMPERATURE);
     }
     else
     {
@@ -116,9 +118,12 @@ void MQTTClient::callback(char *topic, uint8_t *payload, unsigned int length)
     }
     publishState();
   }
+  if (strcmp(topic, TOPIC_CMND_TEMPERATURE) == 0)
+  {
+    RS232.getTemperature();
+  }
   if (strcmp(topic, TOPIC_CMND_COMMAND) == 0)
   {
-
     StaticJsonDocument<200> doc;
     DeserializationError error = deserializeJson(doc, data);
     if (error)
@@ -137,9 +142,10 @@ void MQTTClient::callback(char *topic, uint8_t *payload, unsigned int length)
 
 void MQTTClient::publishState()
 {
-  return;
   boolean power = RS232.getPower();
+  delay(1);
   Source source = RS232.getSource();
+  delay(1);
   float volume = RS232.getVolume();
   StaticJsonDocument<256> doc;
   doc["power"] = power;

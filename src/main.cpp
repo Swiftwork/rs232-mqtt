@@ -19,7 +19,7 @@ int ledState = LOW;
 
 void wifiConnect()
 {
-  Serial.begin(115200);
+  Serial.begin(9600);
 
   // Connect to WiFi access point.
   debugI("Connecting to %s", WIFI_SSID);

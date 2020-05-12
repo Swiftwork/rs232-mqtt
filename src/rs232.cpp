@@ -12,7 +12,9 @@ RS232Util::RS232Util(RemoteDebug &Debug) : Debug(Debug)
 
 boolean RS232Util::set(uint8_t cmd1, uint8_t cmd2, uint8_t value)
 {
-  debugD("%d %d %d", cmd1, cmd2, value);
+  // Clear serial buffer
+  while (Serial.available() > 0)
+    Serial.read();
   // Write = 0x06, 0x14, 0x00, LSB = 0x04, MSB = 0x00, 0x34, CMD2, CMD3, Data, Checksum
   uint8_t set[10] = {0x06, 0x14, 0x00, 0x04, 0x00, 0x34, cmd1, cmd2, value, 0x00};
   checksum(set, 10);
@@ -26,6 +28,9 @@ boolean RS232Util::set(uint8_t cmd1, uint8_t cmd2, uint8_t value)
 
 uint8_t RS232Util::get(uint8_t cmd1, uint8_t cmd2)
 {
+  // Clear serial buffer
+  while (Serial.available() > 0)
+    Serial.read();
   // Read = 0x07, 0x14, 0x00, LSB = 0x05, MSB = 0x00, 0x34, 0x00, 0x00, CMD2, CMD3, Checksum
   uint8_t get[11] = {0x07, 0x14, 0x00, 0x05, 0x00, 0x34, 0x00, 0x00, cmd1, cmd2, 0x00};
   checksum(get, 11);
@@ -68,6 +73,11 @@ boolean RS232Util::setVolume(float percent)
 float RS232Util::getVolume()
 {
   return get(0x14, 0x03) / 0xFF;
+}
+
+float RS232Util::getTemperature()
+{
+  return get(0x15, 0x03);
 }
 
 void RS232Util::debugCommand(char *label, uint8_t *payload, size_t size)
